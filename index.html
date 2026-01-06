@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Savings Allocation Tool</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Savings Allocation</h1>
+            <p class="subtitle">Adjust your savings as % of gross and see take-home pay in real-time</p>
+        </header>
+
+        <!-- Dashboard -->
+        <section class="dashboard">
+            <div class="dashboard-grid">
+                <div class="metric-card primary">
+                    <span class="metric-label">Monthly Take-Home</span>
+                    <span class="metric-value" id="monthlyTakeHome">$0</span>
+                </div>
+                <div class="metric-card">
+                    <span class="metric-label">Annual Take-Home</span>
+                    <span class="metric-value" id="annualTakeHome">$0</span>
+                </div>
+            </div>
+
+            <div class="savings-rate-card">
+                <div class="rate-header">
+                    <span class="rate-label">Savings Rate</span>
+                    <div class="rate-display">
+                        <span class="current-rate" id="currentRate">0%</span>
+                        <span class="target-rate">/ 25% target</span>
+                    </div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="savingsProgress"></div>
+                    <div class="target-marker"></div>
+                </div>
+                <p class="rate-status" id="rateStatus">Enter your income to get started</p>
+            </div>
+        </section>
+
+        <!-- Income Section -->
+        <section class="section">
+            <h2>Income & Taxes</h2>
+            <div class="input-group">
+                <label for="grossSalary">Gross Annual Salary</label>
+                <div class="input-wrapper">
+                    <span class="currency">$</span>
+                    <input type="number" id="grossSalary" placeholder="100,000">
+                </div>
+                <span class="input-hint" id="monthlyGrossHint">$0/month</span>
+            </div>
+            <div class="input-group">
+                <label for="effectiveTaxRate">Effective Tax Rate</label>
+                <div class="input-wrapper">
+                    <input type="number" id="effectiveTaxRate" placeholder="22" min="0" max="50" step="0.5" value="22">
+                    <span class="suffix">%</span>
+                </div>
+                <span class="input-hint">Federal + State + Local combined</span>
+            </div>
+        </section>
+
+        <!-- Fixed Deductions -->
+        <section class="section">
+            <h2>Fixed Deductions</h2>
+            <div class="input-group">
+                <label for="healthInsurance">Health Insurance Premium</label>
+                <div class="input-wrapper">
+                    <span class="currency">$</span>
+                    <input type="number" id="healthInsurance" placeholder="300">
+                    <span class="suffix">/mo</span>
+                </div>
+                <span class="input-hint">Pre-tax payroll deduction</span>
+            </div>
+        </section>
+
+        <!-- Savings Allocations -->
+        <section class="section">
+            <h2>Savings Allocations</h2>
+            <p class="section-hint">All values as % of gross annual salary</p>
+
+            <!-- 401k Limit Warning -->
+            <div class="limit-banner" id="combined401kWarning">
+                401(k): $0 of $23,000 (0% of salary)
+            </div>
+
+            <!-- Pre-tax Allocations -->
+            <div class="allocation-subsection">
+                <h3 class="subsection-title">Pre-Tax (Reduces Taxable Income)</h3>
+
+                <!-- Traditional 401k -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>Traditional 401(k)</label>
+                        <span class="allocation-limit" id="traditional401kLimit">Max: $23,000/yr</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="traditional401kSlider"
+                               min="0" max="100" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="traditional401kInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="traditional401kDollars">$0/yr ($0/mo)</span>
+                        <span class="limit-status" id="traditional401kLimitStatus"></span>
+                    </div>
+                </div>
+
+                <!-- HSA -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>HSA</label>
+                        <div class="hsa-toggle">
+                            <button type="button" class="toggle-btn active" data-type="individual">Individual</button>
+                            <button type="button" class="toggle-btn" data-type="family">Family</button>
+                        </div>
+                        <span class="allocation-limit" id="hsaLimit">Max: $4,150/yr</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="hsaSlider"
+                               min="0" max="100" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="hsaInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="hsaDollars">$0/yr ($0/mo)</span>
+                        <span class="limit-status" id="hsaLimitStatus"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Post-tax Allocations -->
+            <div class="allocation-subsection">
+                <h3 class="subsection-title">Post-Tax (From Take-Home)</h3>
+
+                <!-- Roth 401k -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>Roth 401(k)</label>
+                        <span class="allocation-limit" id="roth401kLimit">Shares $23k limit with Traditional</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="roth401kSlider"
+                               min="0" max="100" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="roth401kInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="roth401kDollars">$0/yr ($0/mo)</span>
+                        <span class="limit-status" id="roth401kLimitStatus"></span>
+                    </div>
+                </div>
+
+                <!-- Roth IRA -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>Roth IRA</label>
+                        <span class="allocation-limit" id="rothIRALimit">Max: $7,000/yr</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="rothIRASlider"
+                               min="0" max="100" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="rothIRAInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="rothIRADollars">$0/yr ($0/mo)</span>
+                        <span class="limit-status" id="rothIRALimitStatus"></span>
+                    </div>
+                </div>
+
+                <!-- Emergency Fund -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>Emergency Fund</label>
+                        <span class="allocation-limit">No limit</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="emergencyFundSlider"
+                               min="0" max="50" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="emergencyFundInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="emergencyFundDollars">$0/yr ($0/mo)</span>
+                    </div>
+                </div>
+
+                <!-- Taxable Brokerage -->
+                <div class="allocation-item">
+                    <div class="allocation-header">
+                        <label>Taxable Brokerage</label>
+                        <span class="allocation-limit">No limit</span>
+                    </div>
+                    <div class="slider-group">
+                        <input type="range" class="allocation-slider" id="taxableBrokerageSlider"
+                               min="0" max="50" step="0.5" value="0">
+                        <div class="input-wrapper compact">
+                            <input type="number" id="taxableBrokerageInput" min="0" max="100" step="0.1" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="allocation-info">
+                        <span class="dollar-equiv" id="taxableBrokerageDollars">$0/yr ($0/mo)</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Income Breakdown -->
+        <section class="section breakdown-section">
+            <h2>Income Breakdown</h2>
+
+            <!-- Visual Bar -->
+            <div class="breakdown-bar">
+                <div class="bar-segment pretax" id="barPreTax"></div>
+                <div class="bar-segment taxes" id="barTaxes"></div>
+                <div class="bar-segment posttax" id="barPostTax"></div>
+                <div class="bar-segment takehome" id="barTakeHome"></div>
+            </div>
+            <div class="bar-legend">
+                <span class="legend-item"><span class="legend-dot pretax"></span>Pre-Tax</span>
+                <span class="legend-item"><span class="legend-dot taxes"></span>Taxes</span>
+                <span class="legend-item"><span class="legend-dot posttax"></span>Post-Tax Savings</span>
+                <span class="legend-item"><span class="legend-dot takehome"></span>Take-Home</span>
+            </div>
+
+            <!-- Itemized List -->
+            <div class="breakdown-list">
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Gross Income</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownGrossAnnual">$0</span>
+                        <span class="monthly" id="breakdownGrossMonthly">$0</span>
+                    </span>
+                </div>
+
+                <div class="breakdown-item deduction">
+                    <span class="breakdown-label">Pre-Tax Deductions</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownPreTaxAnnual">-$0</span>
+                        <span class="monthly" id="breakdownPreTaxMonthly">-$0</span>
+                    </span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Traditional 401(k)</span>
+                    <span id="breakdown401k">$0</span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>HSA</span>
+                    <span id="breakdownHSA">$0</span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Health Insurance</span>
+                    <span id="breakdownHealthIns">$0</span>
+                </div>
+
+                <div class="breakdown-item">
+                    <span class="breakdown-label">Taxable Income</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownTaxableAnnual">$0</span>
+                        <span class="monthly" id="breakdownTaxableMonthly">$0</span>
+                    </span>
+                </div>
+
+                <div class="breakdown-item deduction taxes">
+                    <span class="breakdown-label">Estimated Taxes</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownTaxesAnnual">-$0</span>
+                        <span class="monthly" id="breakdownTaxesMonthly">-$0</span>
+                    </span>
+                </div>
+
+                <div class="breakdown-item">
+                    <span class="breakdown-label">After-Tax Income</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownAfterTaxAnnual">$0</span>
+                        <span class="monthly" id="breakdownAfterTaxMonthly">$0</span>
+                    </span>
+                </div>
+
+                <div class="breakdown-item deduction">
+                    <span class="breakdown-label">Post-Tax Savings</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownPostTaxAnnual">-$0</span>
+                        <span class="monthly" id="breakdownPostTaxMonthly">-$0</span>
+                    </span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Roth 401(k)</span>
+                    <span id="breakdownRoth401k">$0</span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Roth IRA</span>
+                    <span id="breakdownRothIRA">$0</span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Emergency Fund</span>
+                    <span id="breakdownEmergency">$0</span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Taxable Brokerage</span>
+                    <span id="breakdownBrokerage">$0</span>
+                </div>
+
+                <div class="breakdown-item total">
+                    <span class="breakdown-label">Take-Home Pay</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownTakeHomeAnnual">$0</span>
+                        <span class="monthly" id="breakdownTakeHomeMonthly">$0</span>
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>Savings Allocation Tool</p>
+            <button id="resetBtn" class="reset-btn">Reset All Data</button>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
