@@ -181,6 +181,55 @@ header h1 {
     color: var(--text-secondary);
 }
 
+/* Employer Match Section */
+.match-section {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.match-input-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.match-input-row label {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.match-value {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.match-toggle {
+    margin-top: 0.75rem;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.toggle-text {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 /* Sections */
 .section {
     background: var(--bg-card);

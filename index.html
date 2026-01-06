@@ -39,6 +39,23 @@
                     <div class="target-marker"></div>
                 </div>
                 <p class="rate-status" id="rateStatus">Enter your income to get started</p>
+
+                <div class="match-section">
+                    <div class="match-input-row">
+                        <label>Employer Match</label>
+                        <div class="input-wrapper compact">
+                            <input type="number" id="employerMatch" min="0" max="100" step="0.5" value="0">
+                            <span class="suffix">%</span>
+                        </div>
+                    </div>
+                    <div class="match-value" id="matchValue">$0/yr</div>
+                    <div class="match-toggle">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="includeMatchToggle" checked>
+                            <span class="toggle-text">Include match in savings rate</span>
+                        </label>
+                    </div>
+                </div>
             </div>
         </section>
 

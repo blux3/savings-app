@@ -19,6 +19,8 @@ function getDefaultData() {
         effectiveTaxRate: 22,
         healthInsurancePremium: 0,
         hsaCoverageType: 'individual',
+        employerMatch: 0,           // % of gross salary employer contributes
+        includeMatchInRate: true,   // Toggle for savings rate calculation
         allocations: {
             traditional401k: 0,    // % of gross
             roth401k: 0,           // % of gross
@@ -130,6 +132,9 @@ function calculateBreakdown() {
     const emergencyFundDollars = percentToDollars(data.allocations.emergencyFund);
     const taxableBrokerageDollars = percentToDollars(data.allocations.taxableBrokerage);
 
+    // Employer match (doesn't affect taxes or take-home)
+    const employerMatchDollars = percentToDollars(data.employerMatch);
+
     // Pre-tax deductions (annual)
     const preTaxDeductions = {
         traditional401k: traditional401kDollars,
@@ -160,11 +165,21 @@ function calculateBreakdown() {
     const takeHomeAnnual = afterTaxIncome - totalPostTaxAnnual;
     const takeHomeMonthly = takeHomeAnnual / 12;
 
-    // Total savings
+    // Total savings (your contributions only)
     const totalSavingsAnnual = traditional401kDollars + roth401kDollars + hsaDollars +
                                rothIRADollars + emergencyFundDollars + taxableBrokerageDollars;
 
-    const savingsRate = grossAnnual > 0 ? (totalSavingsAnnual / grossAnnual) * 100 : 0;
+    // Savings rate calculation (with or without employer match)
+    let savingsRate;
+    if (grossAnnual > 0) {
+        if (data.includeMatchInRate) {
+            savingsRate = ((totalSavingsAnnual + employerMatchDollars) / grossAnnual) * 100;
+        } else {
+            savingsRate = (totalSavingsAnnual / grossAnnual) * 100;
+        }
+    } else {
+        savingsRate = 0;
+    }
 
     return {
         grossAnnual,
@@ -179,6 +194,7 @@ function calculateBreakdown() {
         takeHomeAnnual,
         takeHomeMonthly,
         totalSavingsAnnual,
+        employerMatchDollars,
         savingsRate
     };
 }
@@ -218,6 +234,12 @@ function updateDashboard(breakdown) {
         takeHomeEl.classList.add('negative');
     } else {
         takeHomeEl.classList.remove('negative');
+    }
+
+    // Employer match display
+    const matchValueEl = document.getElementById('matchValue');
+    if (matchValueEl) {
+        matchValueEl.textContent = formatCurrency(breakdown.employerMatchDollars) + '/yr';
     }
 }
 
@@ -461,6 +483,20 @@ function setupEventListeners() {
         }
     });
 
+    // Employer match input
+    document.getElementById('employerMatch').addEventListener('input', (e) => {
+        data.employerMatch = Math.min(100, Math.max(0, parseNumber(e.target.value)));
+        saveData();
+        updateAllUI();
+    });
+
+    // Include match in rate toggle
+    document.getElementById('includeMatchToggle').addEventListener('change', (e) => {
+        data.includeMatchInRate = e.target.checked;
+        saveData();
+        updateAllUI();
+    });
+
     // Reset button
     document.getElementById('resetBtn').addEventListener('click', () => {
         if (confirm('Reset all data? This cannot be undone.')) {
@@ -481,6 +517,10 @@ function populateForm() {
     document.querySelectorAll('.hsa-toggle .toggle-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.type === data.hsaCoverageType);
     });
+
+    // Employer match
+    document.getElementById('employerMatch').value = data.employerMatch || 0;
+    document.getElementById('includeMatchToggle').checked = data.includeMatchInRate;
 
     // Allocations
     Object.keys(data.allocations).forEach(type => {
