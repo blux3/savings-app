@@ -58,6 +58,15 @@ function loadData() {
             delete data.effectiveTaxRate;
             saveData();
         }
+
+        // Back-fill the income-tax baseline for data saved before it existed,
+        // so previously entered withholding reproduces exactly on load instead
+        // of falling back to the gross-minus-health approximation.
+        if (data.taxInputMode === 'dollars' && !data.taxBaselineIncome
+            && (data.federalTaxPerPaycheck > 0 || data.stateTaxPerPaycheck > 0)) {
+            data.taxBaselineIncome = getTaxableIncome();
+            saveData();
+        }
     } catch (e) {
         console.error('Failed to load saved data:', e);
         data = getDefaultData();
