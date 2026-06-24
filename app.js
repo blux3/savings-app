@@ -3,8 +3,8 @@ const STORAGE_KEY = 'savings_allocation_data_v2';
 
 const IRS_LIMITS = {
     combined401k: 23000,
-    hsaIndividual: 4150,
-    hsaFamily: 8300,
+    hsaIndividual: 4400,
+    hsaFamily: 8750,
     rothIRA: 7000
 };
 
