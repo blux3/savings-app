@@ -260,6 +260,22 @@ function updateUI() {
     $('paycheckTakeHome').classList.toggle('negative', b.paycheckAnnual < 0);
     $('paycheckAfterRothIRA').classList.toggle('negative', b.afterRothIRAAnnual < 0);
     $('paycheckFreqLabel').textContent = freq === 26 ? 'Biweekly · 26/yr' : 'Semi-monthly · 24/yr';
+
+    // Anchor status: compare current taxable income to the locked-in baseline
+    const baseline = data.taxBaselineIncome;
+    const anchorStatus = $('anchorStatus');
+    if (anchorStatus) {
+        if (!(baseline > 0)) {
+            anchorStatus.textContent = 'Not anchored yet — lock in to match your real paycheck';
+            anchorStatus.className = 'anchor-status unset';
+        } else if (Math.abs(b.taxableIncome - baseline) < 1) {
+            anchorStatus.textContent = `Anchored — matches your real paycheck (${formatCurrency(b.paycheckAnnual / freq)}/check)`;
+            anchorStatus.className = 'anchor-status anchored';
+        } else {
+            anchorStatus.textContent = 'Exploring — income tax estimated from your locked-in paycheck. Lock in again if these are now your real numbers.';
+            anchorStatus.className = 'anchor-status exploring';
+        }
+    }
     $('currentRate').textContent = b.savingsRate.toFixed(1) + '%';
     $('savingsProgress').style.width = Math.min(b.savingsRate / 25 * 100, 100) + '%';
     $('monthlyTakeHome').classList.toggle('negative', b.takeHome < 0);
@@ -424,17 +440,11 @@ function setupEvents() {
     bindInput('medicareRate', v => data.medicareRate = clamp(parseNum(v), 0, 10));
     bindInput('otherPayrollTaxRate', v => data.otherPayrollTaxRate = clamp(parseNum(v), 0, 10));
 
-    // Dollar tax inputs — capture the taxable-income baseline as the user
-    // enters withholding, so the derived income-tax rate is anchored to their
-    // current contribution levels.
-    bindInput('federalTaxPerPaycheck', v => {
-        data.federalTaxPerPaycheck = Math.max(0, parseNum(v));
-        data.taxBaselineIncome = getTaxableIncome();
-    });
-    bindInput('stateTaxPerPaycheck', v => {
-        data.stateTaxPerPaycheck = Math.max(0, parseNum(v));
-        data.taxBaselineIncome = getTaxableIncome();
-    });
+    // Dollar tax inputs. The income-tax baseline is set explicitly via the
+    // "Lock in as my real paycheck" button, not while typing, so anchoring is
+    // deliberate and order-independent.
+    bindInput('federalTaxPerPaycheck', v => data.federalTaxPerPaycheck = Math.max(0, parseNum(v)));
+    bindInput('stateTaxPerPaycheck', v => data.stateTaxPerPaycheck = Math.max(0, parseNum(v)));
     bindInput('socialSecurityPerPaycheck', v => data.socialSecurityPerPaycheck = Math.max(0, parseNum(v)));
     bindInput('medicarePerPaycheck', v => data.medicarePerPaycheck = Math.max(0, parseNum(v)));
     bindInput('otherPayrollPerPaycheck', v => data.otherPayrollPerPaycheck = Math.max(0, parseNum(v)));
@@ -481,6 +491,13 @@ function setupEvents() {
         };
         bindInput(type + 'Slider', handler);
         bindInput(type + 'Input', handler);
+    });
+
+    // Anchor: lock in current setup as the real paycheck
+    $('anchorBtn').addEventListener('click', () => {
+        data.taxBaselineIncome = getTaxableIncome();
+        saveData();
+        updateUI();
     });
 
     // Include match toggle

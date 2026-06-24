@@ -155,6 +155,49 @@ header h1 {
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* Paycheck anchor */
+.anchor-box {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
+
+.anchor-btn {
+    width: 100%;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.anchor-btn:hover {
+    background: var(--accent-light);
+}
+
+.anchor-status {
+    margin: 0.6rem 0 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.anchor-status.anchored {
+    color: var(--success);
+}
+
+.anchor-status.exploring {
+    color: var(--warning);
+}
+
+.anchor-status.unset {
+    color: var(--danger);
+}
+
 /* Savings Rate Card */
 .savings-rate-card {
     background: var(--bg-card);
