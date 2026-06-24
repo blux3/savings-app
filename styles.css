@@ -415,14 +415,9 @@ input[type="number"] {
     -webkit-appearance: none;
     appearance: none;
     height: 6px;
-    background: var(--bg-card);
     border-radius: 3px;
     outline: none;
     cursor: pointer;
-}
-
-/* Slider filled track effect */
-.allocation-slider {
     background: linear-gradient(to right,
         var(--accent) 0%,
         var(--accent) var(--slider-percent, 0%),
@@ -497,12 +492,17 @@ input[type="number"] {
 }
 
 /* HSA Toggle */
-.hsa-toggle {
+.hsa-toggle,
+.mode-toggle {
     display: flex;
     background: var(--bg-card);
     border-radius: 6px;
     padding: 2px;
     gap: 2px;
+}
+
+.mode-toggle {
+    margin-top: 0.5rem;
 }
 
 .toggle-btn {

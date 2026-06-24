@@ -70,13 +70,104 @@
                 </div>
                 <span class="input-hint" id="monthlyGrossHint">$0/month</span>
             </div>
+
+            <!-- Tax Input Mode Toggle -->
             <div class="input-group">
-                <label for="effectiveTaxRate">Effective Tax Rate</label>
-                <div class="input-wrapper">
-                    <input type="number" id="effectiveTaxRate" placeholder="22" min="0" max="50" step="0.5" value="22">
-                    <span class="suffix">%</span>
+                <label>Tax Input Mode</label>
+                <div class="mode-toggle">
+                    <button type="button" class="toggle-btn active" data-mode="percentage">Use Percentages</button>
+                    <button type="button" class="toggle-btn" data-mode="dollars">Use Paycheck Amounts</button>
                 </div>
-                <span class="input-hint">Federal + State + Local combined</span>
+            </div>
+
+            <!-- Pay Frequency (only shown in dollar mode) -->
+            <div class="input-group dollar-mode-only" style="display: none;">
+                <label>Pay Frequency</label>
+                <div class="mode-toggle">
+                    <button type="button" class="toggle-btn freq-btn active" data-freq="24">Semi-Monthly (24/yr)</button>
+                    <button type="button" class="toggle-btn freq-btn" data-freq="26">Biweekly (26/yr)</button>
+                </div>
+            </div>
+
+            <!-- Percentage-based inputs -->
+            <div class="percentage-mode-inputs">
+                <div class="input-group">
+                    <label for="incomeTaxRate">Income Tax Rate</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="incomeTaxRate" placeholder="22" min="0" max="50" step="0.5" value="22">
+                        <span class="suffix">%</span>
+                    </div>
+                    <span class="input-hint">Federal + State + Local combined</span>
+                </div>
+                <div class="input-group">
+                    <label for="socialSecurityRate">Social Security (OASDI)</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="socialSecurityRate" placeholder="6.2" min="0" max="20" step="0.1" value="6.2">
+                        <span class="suffix">%</span>
+                    </div>
+                    <span class="input-hint">Typically 6.2% - applied to gross pay</span>
+                </div>
+                <div class="input-group">
+                    <label for="medicareRate">Medicare</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="medicareRate" placeholder="1.45" min="0" max="10" step="0.05" value="1.45">
+                        <span class="suffix">%</span>
+                    </div>
+                    <span class="input-hint">Typically 1.45% - applied to gross pay</span>
+                </div>
+                <div class="input-group">
+                    <label for="otherPayrollTaxRate">Other Payroll Taxes</label>
+                    <div class="input-wrapper">
+                        <input type="number" id="otherPayrollTaxRate" placeholder="0" min="0" max="10" step="0.1" value="0">
+                        <span class="suffix">%</span>
+                    </div>
+                    <span class="input-hint">NY PFL, state disability, etc. - applied to gross pay</span>
+                </div>
+            </div>
+
+            <!-- Dollar-based inputs (per paycheck) -->
+            <div class="dollar-mode-inputs" style="display: none;">
+                <p class="section-hint">Enter amounts from your paycheck. Income taxes will adjust automatically when you change pre-tax contributions (Traditional 401k, HSA).</p>
+                <div class="input-group">
+                    <label for="federalTaxPerPaycheck">Federal Tax</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="federalTaxPerPaycheck" placeholder="0" min="0" step="0.01" value="0">
+                    </div>
+                    <span class="input-hint">Per paycheck</span>
+                </div>
+                <div class="input-group">
+                    <label for="stateTaxPerPaycheck">State/Local Tax</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="stateTaxPerPaycheck" placeholder="0" min="0" step="0.01" value="0">
+                    </div>
+                    <span class="input-hint">Per paycheck</span>
+                </div>
+                <div class="input-group">
+                    <label for="socialSecurityPerPaycheck">Social Security</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="socialSecurityPerPaycheck" placeholder="0" min="0" step="0.01" value="0">
+                    </div>
+                    <span class="input-hint">Per paycheck</span>
+                </div>
+                <div class="input-group">
+                    <label for="medicarePerPaycheck">Medicare</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="medicarePerPaycheck" placeholder="0" min="0" step="0.01" value="0">
+                    </div>
+                    <span class="input-hint">Per paycheck</span>
+                </div>
+                <div class="input-group">
+                    <label for="otherPayrollPerPaycheck">Other Payroll Taxes</label>
+                    <div class="input-wrapper">
+                        <span class="currency">$</span>
+                        <input type="number" id="otherPayrollPerPaycheck" placeholder="0" min="0" step="0.01" value="0">
+                    </div>
+                    <span class="input-hint">NY PFL, state disability, etc. - per paycheck</span>
+                </div>
             </div>
         </section>
 
@@ -299,6 +390,22 @@
                         <span class="annual" id="breakdownTaxesAnnual">-$0</span>
                         <span class="monthly" id="breakdownTaxesMonthly">-$0</span>
                     </span>
+                </div>
+                <div class="breakdown-subitem">
+                    <span>Payroll Taxes (FICA + Other)</span>
+                    <span id="breakdownPayrollTaxes">$0</span>
+                </div>
+                <div class="breakdown-subitem dollar-mode-detail" style="display: none;">
+                    <span>Federal Tax</span>
+                    <span id="breakdownFederalTax">$0</span>
+                </div>
+                <div class="breakdown-subitem dollar-mode-detail" style="display: none;">
+                    <span>State/Local Tax</span>
+                    <span id="breakdownStateTax">$0</span>
+                </div>
+                <div class="breakdown-subitem percentage-mode-detail">
+                    <span>Income Tax</span>
+                    <span id="breakdownIncomeTax">$0</span>
                 </div>
 
                 <div class="breakdown-item">
