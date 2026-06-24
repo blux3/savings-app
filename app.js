@@ -2,10 +2,10 @@
 const STORAGE_KEY = 'savings_allocation_data_v2';
 
 const IRS_LIMITS = {
-    combined401k: 23000,
+    combined401k: 24500,
     hsaIndividual: 4400,
     hsaFamily: 8750,
-    rothIRA: 7000
+    rothIRA: 7500
 };
 
 let data = getDefaultData();
@@ -381,21 +381,21 @@ function updateUI() {
     const combined401k = percentToDollars(data.allocations.traditional401k + data.allocations.roth401k);
     const warning = $('combined401kWarning');
     if (combined401k >= IRS_LIMITS.combined401k) {
-        warning.textContent = '401(k) limit reached ($23,000)';
+        warning.textContent = '401(k) limit reached ($24,500)';
         warning.className = 'limit-banner at-limit';
     } else {
         const pct = data.allocations.traditional401k + data.allocations.roth401k;
-        warning.textContent = `401(k): ${formatCurrency(combined401k)} of $23,000 (${pct.toFixed(1)}% of salary)`;
+        warning.textContent = `401(k): ${formatCurrency(combined401k)} of $24,500 (${pct.toFixed(1)}% of salary)`;
         warning.className = 'limit-banner';
     }
 
     // Limit displays
     const salary = data.grossAnnualSalary;
     $('traditional401kLimit').textContent = salary > 0
-        ? `Max: ${dollarsToPercent(IRS_LIMITS.combined401k).toFixed(1)}% ($23,000)` : 'Max: $23,000/yr';
+        ? `Max: ${dollarsToPercent(IRS_LIMITS.combined401k).toFixed(1)}% ($24,500)` : 'Max: $24,500/yr';
     $('roth401kLimit').textContent = 'Shares $23k limit with Traditional';
     $('rothIRALimit').textContent = salary > 0
-        ? `Max: ${dollarsToPercent(IRS_LIMITS.rothIRA).toFixed(1)}% ($7,000)` : 'Max: $7,000/yr';
+        ? `Max: ${dollarsToPercent(IRS_LIMITS.rothIRA).toFixed(1)}% ($7,500)` : 'Max: $7,500/yr';
 
     const hsaLimit = getHSALimit();
     $('hsaLimit').textContent = `Max: ${formatCurrency(hsaLimit)}/yr (${dollarsToPercent(hsaLimit).toFixed(1)}% of salary)`;
