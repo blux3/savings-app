@@ -26,6 +26,10 @@ function getDefaultData() {
         socialSecurityPerPaycheck: 0,
         medicarePerPaycheck: 0,
         otherPayrollPerPaycheck: 0,
+        // Taxable income at the time withholding was entered; anchors the
+        // derived income-tax rate so the entered dollars reproduce exactly
+        // and then scale as pre-tax contributions change.
+        taxBaselineIncome: 0,
         healthInsurancePremium: 0,
         hsaCoverageType: 'individual',
         employerMatch: 0,
@@ -88,6 +92,15 @@ function percentToDollars(pct) {
 
 function dollarsToPercent(dollars) {
     return data.grossAnnualSalary > 0 ? (dollars / data.grossAnnualSalary) * 100 : 0;
+}
+
+// Income subject to income tax: gross minus pre-tax deductions (Traditional
+// 401k, HSA, health insurance).
+function getTaxableIncome() {
+    const preTax = percentToDollars(data.allocations.traditional401k)
+        + percentToDollars(data.allocations.hsa)
+        + data.healthInsurancePremium * 12;
+    return Math.max(0, data.grossAnnualSalary - preTax);
 }
 
 // ====== LIMITS ======
@@ -153,8 +166,13 @@ function calculateBreakdown() {
         const enteredState = data.stateTaxPerPaycheck * freq;
         const enteredIncomeTax = enteredFederal + enteredState;
 
-        // Reference income = gross minus health insurance (base before 401k/HSA deductions)
-        const referenceIncome = gross - healthInsAnnual;
+        // Anchor the effective rate to the taxable income captured when the
+        // withholding was entered, so the entered dollars reproduce exactly at
+        // that point and scale proportionally as pre-tax contributions change.
+        // Fall back to gross minus health if no baseline was captured yet.
+        const referenceIncome = data.taxBaselineIncome > 0
+            ? data.taxBaselineIncome
+            : gross - healthInsAnnual;
 
         if (referenceIncome > 0 && enteredIncomeTax > 0) {
             // Calculate effective rate and apply to actual taxable income
@@ -397,9 +415,17 @@ function setupEvents() {
     bindInput('medicareRate', v => data.medicareRate = clamp(parseNum(v), 0, 10));
     bindInput('otherPayrollTaxRate', v => data.otherPayrollTaxRate = clamp(parseNum(v), 0, 10));
 
-    // Dollar tax inputs
-    bindInput('federalTaxPerPaycheck', v => data.federalTaxPerPaycheck = Math.max(0, parseNum(v)));
-    bindInput('stateTaxPerPaycheck', v => data.stateTaxPerPaycheck = Math.max(0, parseNum(v)));
+    // Dollar tax inputs — capture the taxable-income baseline as the user
+    // enters withholding, so the derived income-tax rate is anchored to their
+    // current contribution levels.
+    bindInput('federalTaxPerPaycheck', v => {
+        data.federalTaxPerPaycheck = Math.max(0, parseNum(v));
+        data.taxBaselineIncome = getTaxableIncome();
+    });
+    bindInput('stateTaxPerPaycheck', v => {
+        data.stateTaxPerPaycheck = Math.max(0, parseNum(v));
+        data.taxBaselineIncome = getTaxableIncome();
+    });
     bindInput('socialSecurityPerPaycheck', v => data.socialSecurityPerPaycheck = Math.max(0, parseNum(v)));
     bindInput('medicarePerPaycheck', v => data.medicarePerPaycheck = Math.max(0, parseNum(v)));
     bindInput('otherPayrollPerPaycheck', v => data.otherPayrollPerPaycheck = Math.max(0, parseNum(v)));
