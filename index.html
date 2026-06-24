@@ -15,8 +15,25 @@
 
         <!-- Dashboard -->
         <section class="dashboard">
+            <!-- Per-Paycheck Take-Home -->
+            <div class="metric-card primary paycheck-card">
+                <span class="metric-label">Per-Paycheck Take-Home</span>
+                <span class="paycheck-freq" id="paycheckFreqLabel">Semi-monthly · 24/yr</span>
+                <div class="paycheck-rows">
+                    <div class="paycheck-row">
+                        <span class="paycheck-row-value" id="paycheckTakeHome">$0</span>
+                        <span class="paycheck-row-label">In your check</span>
+                    </div>
+                    <div class="paycheck-divider"></div>
+                    <div class="paycheck-row">
+                        <span class="paycheck-row-value" id="paycheckAfterRothIRA">$0</span>
+                        <span class="paycheck-row-label">After Roth IRA</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="dashboard-grid">
-                <div class="metric-card primary">
+                <div class="metric-card">
                     <span class="metric-label">Monthly Take-Home</span>
                     <span class="metric-value" id="monthlyTakeHome">$0</span>
                 </div>

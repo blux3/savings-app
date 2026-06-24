@@ -197,6 +197,11 @@ function calculateBreakdown() {
     const takeHome = afterTax - totalPostTax;
     const totalSavings = Object.values(dollars).reduce((a, b) => a + b, 0);
 
+    // Per-paycheck view: the deposited check excludes only payroll-withheld
+    // items (Roth 401k). Roth IRA is funded manually after the check arrives.
+    const paycheckAnnual = afterTax - dollars.roth401k;
+    const afterRothIRAAnnual = paycheckAnnual - dollars.rothIRA;
+
     const savingsRate = gross > 0
         ? ((totalSavings + (data.includeMatchInRate ? employerMatchDollars : 0)) / gross) * 100
         : 0;
@@ -204,7 +209,7 @@ function calculateBreakdown() {
     return {
         gross, taxableIncome, taxes, afterTax, takeHome, savingsRate,
         preTaxDeductions, postTaxDeductions, totalPreTax, totalPostTax,
-        totalSavings, employerMatchDollars
+        totalSavings, employerMatchDollars, paycheckAnnual, afterRothIRAAnnual
     };
 }
 
@@ -220,6 +225,14 @@ function updateUI() {
     // Dashboard
     $('monthlyTakeHome').textContent = formatCurrency(b.takeHome / 12);
     $('annualTakeHome').textContent = formatCurrency(b.takeHome);
+
+    // Per-paycheck take-home (before and after manual Roth IRA contribution)
+    const freq = data.payFrequency;
+    $('paycheckTakeHome').textContent = formatCurrency(b.paycheckAnnual / freq);
+    $('paycheckAfterRothIRA').textContent = formatCurrency(b.afterRothIRAAnnual / freq);
+    $('paycheckTakeHome').classList.toggle('negative', b.paycheckAnnual < 0);
+    $('paycheckAfterRothIRA').classList.toggle('negative', b.afterRothIRAAnnual < 0);
+    $('paycheckFreqLabel').textContent = freq === 26 ? 'Biweekly · 26/yr' : 'Semi-monthly · 24/yr';
     $('currentRate').textContent = b.savingsRate.toFixed(1) + '%';
     $('savingsProgress').style.width = Math.min(b.savingsRate / 25 * 100, 100) + '%';
     $('monthlyTakeHome').classList.toggle('negative', b.takeHome < 0);

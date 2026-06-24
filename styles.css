@@ -108,6 +108,53 @@ header h1 {
     color: var(--danger);
 }
 
+/* Per-Paycheck Card */
+.paycheck-card {
+    margin-bottom: 1rem;
+}
+
+.paycheck-freq {
+    display: block;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.85);
+    margin: -0.25rem 0 0.9rem;
+}
+
+.paycheck-rows {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    gap: 1.75rem;
+}
+
+.paycheck-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.paycheck-row-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: white;
+}
+
+.paycheck-row-value.negative {
+    color: #ffd1d1;
+}
+
+.paycheck-row-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.paycheck-divider {
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
 /* Savings Rate Card */
 .savings-rate-card {
     background: var(--bg-card);
