@@ -207,6 +207,23 @@
                     </div>
                     <span class="input-hint">Your HSA comes out of only one check a month, so the two stubs differ. Pick the one you copied from.</span>
                 </div>
+                <div class="stub-hsa-group" style="display: none;">
+                    <p class="section-hint">Optional: from a check <span class="other-stub-kind">without</span> HSA, enter its income tax so both checks match exactly. Then lock in again.</p>
+                    <div class="input-group">
+                        <label for="otherStubFederal">Federal Tax (check <span class="other-stub-kind">without</span> HSA)</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="otherStubFederal" placeholder="0" min="0" step="0.01">
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="otherStubState">State/Local Tax (check <span class="other-stub-kind">without</span> HSA)</label>
+                        <div class="input-wrapper">
+                            <span class="currency">$</span>
+                            <input type="number" id="otherStubState" placeholder="0" min="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
                 <div class="input-group">
                     <label for="federalTaxPerPaycheck">Federal Tax</label>
                     <div class="input-wrapper">

@@ -38,6 +38,12 @@ function getDefaultData() {
         hsaSchedule: 'every',
         // Whether the entered withholding came from a check with HSA taken out.
         taxStubHasHSA: true,
+        // Optional income tax from the *other* check (the opposite HSA case).
+        // With both stubs, tax changes are scaled by the real top-bracket
+        // rate between them instead of the lower average rate.
+        otherStubFederal: 0,
+        otherStubState: 0,
+        otherStubBaselineIncome: 0,
         employerMatch: 0,
         includeMatchInRate: true,
         allocations: {
@@ -148,7 +154,16 @@ function stubHasHSA() {
 function getStubBaseline() {
     const w = getCheckWages(stubHasHSA());
     const freq = data.payFrequency;
-    return { income: w.taxable * freq, fica: w.ficaWages * freq };
+    const result = { income: w.taxable * freq, fica: w.ficaWages * freq, otherIncome: 0 };
+    if (data.hsaSchedule === 'monthly') {
+        result.otherIncome = getCheckWages(!stubHasHSA()).taxable * freq;
+    }
+    return result;
+}
+
+function hasOtherStub() {
+    return data.hsaSchedule === 'monthly'
+        && (data.otherStubFederal > 0 || data.otherStubState > 0);
 }
 
 // ====== LIMITS ======
@@ -203,6 +218,14 @@ function calculateBreakdown() {
     // Fall back to gross minus health if no baseline was captured yet.
     const incomeRef = (data.taxBaselineIncome > 0 ? data.taxBaselineIncome : gross - healthInsAnnual) / freq;
     const ficaRef = data.ficaBaselineWages / freq;
+    // Two-stub mode: the top-bracket rate between the two real checks.
+    const otherRef = data.otherStubBaselineIncome / freq;
+    const twoStub = hasOtherStub() && data.taxBaselineIncome > 0 && otherRef > 0
+        && Math.abs(otherRef - incomeRef) > 0.5;
+    const marginal = twoStub ? {
+        federal: (data.otherStubFederal - data.federalTaxPerPaycheck) / (otherRef - incomeRef),
+        state: (data.otherStubState - data.stateTaxPerPaycheck) / (otherRef - incomeRef)
+    } : null;
 
     // Taxes and take-home for one check, with or without HSA taken out.
     const calcCheck = hasHSA => {
@@ -213,15 +236,23 @@ function calculateBreakdown() {
             t = {
                 ss: data.socialSecurityPerPaycheck * ficaScale,
                 medicare: data.medicarePerPaycheck * ficaScale,
-                other: data.otherPayrollPerPaycheck * ficaScale
+                // NY PFL / disability are based on gross, not reduced by HSA.
+                other: data.otherPayrollPerPaycheck
             };
-            if (incomeRef > 0 && enteredIncomeTax > 0) {
-                t.income = w.taxable * (enteredIncomeTax / incomeRef);
+            if (twoStub) {
+                const delta = w.taxable - incomeRef;
+                t.federal = Math.max(0, data.federalTaxPerPaycheck + marginal.federal * delta);
+                t.state = Math.max(0, data.stateTaxPerPaycheck + marginal.state * delta);
+                t.income = t.federal + t.state;
             } else {
-                t.income = enteredIncomeTax;
+                if (incomeRef > 0 && enteredIncomeTax > 0) {
+                    t.income = w.taxable * (enteredIncomeTax / incomeRef);
+                } else {
+                    t.income = enteredIncomeTax;
+                }
+                t.federal = t.income * federalRatio;
+                t.state = t.income - t.federal;
             }
-            t.federal = t.income * federalRatio;
-            t.state = t.income - t.federal;
         } else {
             t = {
                 federal: null,
@@ -315,6 +346,8 @@ function updateUI() {
     }
     $('sumCheckLabel').textContent = split ? 'Avg / Check' : 'Per Check';
     $$('.stub-hsa-group').forEach(el => el.style.display = split ? 'block' : 'none');
+    const otherLabel = stubHasHSA() ? 'without' : 'with';
+    $$('.other-stub-kind').forEach(el => el.textContent = otherLabel);
 
     // Anchor status: compare the stub check's current taxable income to the
     // locked-in baseline
@@ -323,6 +356,9 @@ function updateUI() {
     if (anchorStatus) {
         if (!(baseline > 0)) {
             anchorStatus.textContent = 'Not anchored yet — lock in to match your real paycheck';
+            anchorStatus.className = 'anchor-status unset';
+        } else if (hasOtherStub() && !(data.otherStubBaselineIncome > 0)) {
+            anchorStatus.textContent = 'Other check entered — lock in again to use both stubs.';
             anchorStatus.className = 'anchor-status unset';
         } else if (Math.abs(getStubBaseline().income - baseline) < 1) {
             const stubCheck = stubHasHSA() ? b.checks.withHSA : b.checks.withoutHSA;
@@ -423,11 +459,18 @@ function updateUI() {
             // getMaxPercent returns the cap for this allocation, not the
             // remaining headroom, so pct must not be added back in.
             const maxPct = getMaxPercent(type);
-            slider.max = maxPct;
+            // 401k sliders share one limit. Keep both tracks on the full
+            // combined scale so moving one doesn't rescale (and visibly
+            // shift) the other; the handler still clamps to the headroom.
+            const is401k = type === 'traditional401k' || type === 'roth401k';
+            slider.max = is401k && data.grossAnnualSalary > 0
+                ? Math.min(100, dollarsToPercent(IRS_LIMITS.combined401k))
+                : maxPct;
             input.max = maxPct.toFixed(1);
-            // Never rewrite the control the user is editing: reformatting on
-            // every keystroke makes multi-digit and decimal entry impossible.
-            if (slider !== document.activeElement) slider.value = pct;
+            // Never rewrite the text box being typed in: reformatting on every
+            // keystroke makes multi-digit and decimal entry impossible. The
+            // slider is always synced so it stops at the clamped value.
+            slider.value = pct;
             if (input !== document.activeElement) input.value = pct.toFixed(1);
             updateSliderFill(slider);
         }
@@ -468,7 +511,7 @@ function updateUI() {
     const salary = data.grossAnnualSalary;
     $('traditional401kLimit').textContent = salary > 0
         ? `Max: ${dollarsToPercent(IRS_LIMITS.combined401k).toFixed(1)}% ($24,500)` : 'Max: $24,500/yr';
-    $('roth401kLimit').textContent = 'Shares $23k limit with Traditional';
+    $('roth401kLimit').textContent = 'Shares $24,500 limit with Traditional';
     $('rothIRALimit').textContent = salary > 0
         ? `Max: ${dollarsToPercent(IRS_LIMITS.rothIRA).toFixed(1)}% ($7,500)` : 'Max: $7,500/yr';
 
@@ -523,6 +566,8 @@ function setupEvents() {
     bindInput('socialSecurityPerPaycheck', v => data.socialSecurityPerPaycheck = Math.max(0, parseNum(v)));
     bindInput('medicarePerPaycheck', v => data.medicarePerPaycheck = Math.max(0, parseNum(v)));
     bindInput('otherPayrollPerPaycheck', v => data.otherPayrollPerPaycheck = Math.max(0, parseNum(v)));
+    bindInput('otherStubFederal', v => data.otherStubFederal = Math.max(0, parseNum(v)));
+    bindInput('otherStubState', v => data.otherStubState = Math.max(0, parseNum(v)));
 
     // Toggles
     $$('.mode-toggle .toggle-btn[data-mode]').forEach(btn => {
@@ -602,6 +647,7 @@ function setupEvents() {
         const stub = getStubBaseline();
         data.taxBaselineIncome = stub.income;
         data.ficaBaselineWages = stub.fica;
+        data.otherStubBaselineIncome = stub.otherIncome;
         saveData();
         updateUI();
     });
@@ -643,6 +689,8 @@ function populateForm() {
     $('socialSecurityPerPaycheck').value = data.socialSecurityPerPaycheck || 0;
     $('medicarePerPaycheck').value = data.medicarePerPaycheck || 0;
     $('otherPayrollPerPaycheck').value = data.otherPayrollPerPaycheck || 0;
+    $('otherStubFederal').value = data.otherStubFederal || '';
+    $('otherStubState').value = data.otherStubState || '';
 
     // Toggles
     $$('.hsa-toggle .toggle-btn[data-type]').forEach(btn =>
