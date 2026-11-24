@@ -198,6 +198,83 @@ header h1 {
     color: var(--danger);
 }
 
+/* Summary table */
+.summary-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.summary-head,
+.summary-row {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.summary-head {
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.summary-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.col-label {
+    text-align: right;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+
+.summary-row {
+    padding: 0.45rem 0;
+}
+
+.summary-label {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.summary-row .num {
+    text-align: right;
+    font-size: 0.9rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+
+.summary-row .num.neg {
+    color: var(--text-secondary);
+}
+
+.summary-row.gross .summary-label,
+.summary-row.gross .num {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.summary-row.takehome {
+    margin-top: 0.3rem;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border);
+}
+
+.summary-row.takehome .summary-label,
+.summary-row.takehome .num {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--success);
+}
+
 /* Savings Rate Card */
 .savings-rate-card {
     background: var(--bg-card);
@@ -716,20 +793,48 @@ input[type="number"] {
     display: flex;
     gap: 1.5rem;
     font-size: 0.85rem;
+    /* Equal-width digits, so the figures align place-by-place down a column
+       (matches the summary table above). */
+    font-variant-numeric: tabular-nums;
 }
 
+/* Fixed widths, not min-width: every row's columns have to line up under the
+   headings, and a wide value in one row must not shift its neighbours left. */
 .breakdown-values .annual {
-    min-width: 80px;
+    width: 96px;
+    flex: 0 0 auto;
     text-align: right;
+    white-space: nowrap;
     color: var(--text-primary);
     font-weight: 500;
 }
 
 .breakdown-values .monthly {
-    min-width: 70px;
+    width: 84px;
+    flex: 0 0 auto;
     text-align: right;
+    white-space: nowrap;
     color: var(--text-muted);
     font-size: 0.8rem;
+}
+
+/* Column headings. Horizontal padding matches .breakdown-item so each label
+   sits directly over its column. */
+.breakdown-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0 0.75rem 0.375rem;
+}
+
+.breakdown-header .breakdown-label,
+.breakdown-header .annual,
+.breakdown-header .monthly {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
 }
 
 .breakdown-item.deduction .breakdown-values .annual,
@@ -748,6 +853,17 @@ input[type="number"] {
     padding: 0.25rem 0.75rem 0.25rem 1.5rem;
     font-size: 0.75rem;
     color: var(--text-muted);
+}
+
+/* Sub-item amounts are annual figures, so they sit in the Annual column while
+   keeping the sub-item's muted type instead of the main-row treatment. */
+.breakdown-subitem .breakdown-values {
+    font-size: inherit;
+}
+
+.breakdown-subitem .breakdown-values .annual {
+    color: inherit;
+    font-weight: 400;
 }
 
 .breakdown-item.total {
@@ -830,15 +946,18 @@ footer {
         margin-left: 0;
     }
 
+    /* Keep the two columns side by side so they stay under their headings;
+       just tighten them up for narrow screens. */
     .breakdown-values {
-        flex-direction: column;
-        gap: 0.125rem;
-        text-align: right;
+        gap: 0.75rem;
     }
 
-    .breakdown-values .annual,
+    .breakdown-values .annual {
+        width: 78px;
+    }
+
     .breakdown-values .monthly {
-        min-width: auto;
+        width: 66px;
     }
 
     .bar-legend {
@@ -869,4 +988,39 @@ footer {
 ::selection {
     background: var(--accent);
     color: white;
+}
+
+/* Split paycheck: HSA taken from only one check a month */
+.paycheck-rows.split {
+    gap: 1.25rem;
+}
+
+.paycheck-col {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+}
+
+.paycheck-col-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: white;
+}
+
+.paycheck-row-value.small {
+    font-size: 1.2rem;
+}
+
+.hsa-schedule {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.hsa-schedule-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
 }

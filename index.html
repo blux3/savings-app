@@ -19,7 +19,7 @@
             <div class="metric-card primary paycheck-card">
                 <span class="metric-label">Per-Paycheck Take-Home</span>
                 <span class="paycheck-freq" id="paycheckFreqLabel">Semi-monthly · 24/yr</span>
-                <div class="paycheck-rows">
+                <div class="paycheck-rows" id="paycheckSingle">
                     <div class="paycheck-row">
                         <span class="paycheck-row-value" id="paycheckTakeHome">$0</span>
                         <span class="paycheck-row-label">In your check</span>
@@ -30,16 +30,70 @@
                         <span class="paycheck-row-label">After Roth IRA</span>
                     </div>
                 </div>
+                <!-- Two different checks when HSA comes out of only one check a month -->
+                <div class="paycheck-rows split" id="paycheckSplit" style="display: none;">
+                    <div class="paycheck-col">
+                        <span class="paycheck-col-title" id="paycheckWithHSATitle">With HSA</span>
+                        <div class="paycheck-row">
+                            <span class="paycheck-row-value" id="paycheckWithHSA">$0</span>
+                            <span class="paycheck-row-label">In your check</span>
+                        </div>
+                        <div class="paycheck-row">
+                            <span class="paycheck-row-value small" id="paycheckWithHSAAfterRothIRA">$0</span>
+                            <span class="paycheck-row-label">After Roth IRA</span>
+                        </div>
+                    </div>
+                    <div class="paycheck-divider"></div>
+                    <div class="paycheck-col">
+                        <span class="paycheck-col-title" id="paycheckWithoutHSATitle">Without HSA</span>
+                        <div class="paycheck-row">
+                            <span class="paycheck-row-value" id="paycheckWithoutHSA">$0</span>
+                            <span class="paycheck-row-label">In your check</span>
+                        </div>
+                        <div class="paycheck-row">
+                            <span class="paycheck-row-value small" id="paycheckWithoutHSAAfterRothIRA">$0</span>
+                            <span class="paycheck-row-label">After Roth IRA</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div class="dashboard-grid">
-                <div class="metric-card">
-                    <span class="metric-label">Monthly Take-Home</span>
-                    <span class="metric-value" id="monthlyTakeHome">$0</span>
+            <div class="summary-card">
+                <div class="summary-head">
+                    <span class="summary-title">Summary</span>
+                    <span class="col-label" id="sumCheckLabel">Per Check</span>
+                    <span class="col-label">Monthly</span>
+                    <span class="col-label">Yearly</span>
                 </div>
-                <div class="metric-card">
-                    <span class="metric-label">Annual Take-Home</span>
-                    <span class="metric-value" id="annualTakeHome">$0</span>
+                <div class="summary-row gross">
+                    <span class="summary-label">Gross Income</span>
+                    <span class="num" id="sumGrossCheck">$0</span>
+                    <span class="num" id="sumGrossMonth">$0</span>
+                    <span class="num" id="sumGrossYear">$0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Taxes</span>
+                    <span class="num neg" id="sumTaxCheck">$0</span>
+                    <span class="num neg" id="sumTaxMonth">$0</span>
+                    <span class="num neg" id="sumTaxYear">$0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Health Insurance</span>
+                    <span class="num neg" id="sumHealthCheck">$0</span>
+                    <span class="num neg" id="sumHealthMonth">$0</span>
+                    <span class="num neg" id="sumHealthYear">$0</span>
+                </div>
+                <div class="summary-row">
+                    <span class="summary-label">Savings</span>
+                    <span class="num neg" id="sumSavingsCheck">$0</span>
+                    <span class="num neg" id="sumSavingsMonth">$0</span>
+                    <span class="num neg" id="sumSavingsYear">$0</span>
+                </div>
+                <div class="summary-row takehome">
+                    <span class="summary-label">Take-Home</span>
+                    <span class="num" id="sumTakeHomeCheck">$0</span>
+                    <span class="num" id="sumTakeHomeMonth">$0</span>
+                    <span class="num" id="sumTakeHomeYear">$0</span>
                 </div>
             </div>
 
@@ -145,6 +199,14 @@
             <!-- Dollar-based inputs (per paycheck) -->
             <div class="dollar-mode-inputs" style="display: none;">
                 <p class="section-hint">Enter amounts from your paycheck. Income taxes will adjust automatically when you change pre-tax contributions (Traditional 401k, HSA).</p>
+                <div class="input-group stub-hsa-group" style="display: none;">
+                    <label>These amounts are from</label>
+                    <div class="mode-toggle stub-toggle">
+                        <button type="button" class="toggle-btn active" data-stub="with">A check with HSA</button>
+                        <button type="button" class="toggle-btn" data-stub="without">A check without HSA</button>
+                    </div>
+                    <span class="input-hint">Your HSA comes out of only one check a month, so the two stubs differ. Pick the one you copied from.</span>
+                </div>
                 <div class="input-group">
                     <label for="federalTaxPerPaycheck">Federal Tax</label>
                     <div class="input-wrapper">
@@ -265,6 +327,13 @@
                         <span class="dollar-equiv" id="hsaDollars">$0/yr ($0/mo)</span>
                         <span class="limit-status" id="hsaLimitStatus"></span>
                     </div>
+                    <div class="hsa-schedule">
+                        <span class="hsa-schedule-label">Taken from</span>
+                        <div class="hsa-toggle hsa-schedule-toggle">
+                            <button type="button" class="toggle-btn active" data-schedule="every">Every check</button>
+                            <button type="button" class="toggle-btn" data-schedule="monthly">1 check per month</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -372,6 +441,14 @@
 
             <!-- Itemized List -->
             <div class="breakdown-list">
+                <div class="breakdown-header">
+                    <span class="breakdown-label">Line item</span>
+                    <span class="breakdown-values">
+                        <span class="annual">Annual</span>
+                        <span class="monthly">Monthly</span>
+                    </span>
+                </div>
+
                 <div class="breakdown-item">
                     <span class="breakdown-label">Gross Income</span>
                     <span class="breakdown-values">
@@ -389,15 +466,24 @@
                 </div>
                 <div class="breakdown-subitem">
                     <span>Traditional 401(k)</span>
-                    <span id="breakdown401k">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdown401k">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem">
                     <span>HSA</span>
-                    <span id="breakdownHSA">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownHSA">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem">
                     <span>Health Insurance</span>
-                    <span id="breakdownHealthIns">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownHealthIns">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
 
                 <div class="breakdown-item">
@@ -417,19 +503,31 @@
                 </div>
                 <div class="breakdown-subitem">
                     <span>Payroll Taxes (FICA + Other)</span>
-                    <span id="breakdownPayrollTaxes">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownPayrollTaxes">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem dollar-mode-detail" style="display: none;">
                     <span>Federal Tax</span>
-                    <span id="breakdownFederalTax">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownFederalTax">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem dollar-mode-detail" style="display: none;">
                     <span>State/Local Tax</span>
-                    <span id="breakdownStateTax">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownStateTax">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem percentage-mode-detail">
                     <span>Income Tax</span>
-                    <span id="breakdownIncomeTax">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownIncomeTax">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
 
                 <div class="breakdown-item">
@@ -449,19 +547,31 @@
                 </div>
                 <div class="breakdown-subitem">
                     <span>Roth 401(k)</span>
-                    <span id="breakdownRoth401k">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownRoth401k">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem">
                     <span>Roth IRA</span>
-                    <span id="breakdownRothIRA">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownRothIRA">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem">
                     <span>Emergency Fund</span>
-                    <span id="breakdownEmergency">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownEmergency">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
                 <div class="breakdown-subitem">
                     <span>Taxable Brokerage</span>
-                    <span id="breakdownBrokerage">$0</span>
+                    <span class="breakdown-values">
+                        <span class="annual" id="breakdownBrokerage">$0</span>
+                        <span class="monthly"></span>
+                    </span>
                 </div>
 
                 <div class="breakdown-item total">

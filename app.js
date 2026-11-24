@@ -30,8 +30,14 @@ function getDefaultData() {
         // derived income-tax rate so the entered dollars reproduce exactly
         // and then scale as pre-tax contributions change.
         taxBaselineIncome: 0,
+        // FICA wages at lock-in, so entered SS/Medicare scale with HSA too.
+        ficaBaselineWages: 0,
         healthInsurancePremium: 0,
         hsaCoverageType: 'individual',
+        // 'every' = HSA out of every check; 'monthly' = out of one check a month.
+        hsaSchedule: 'every',
+        // Whether the entered withholding came from a check with HSA taken out.
+        taxStubHasHSA: true,
         employerMatch: 0,
         includeMatchInRate: true,
         allocations: {
@@ -64,7 +70,12 @@ function loadData() {
         // of falling back to the gross-minus-health approximation.
         if (data.taxInputMode === 'dollars' && !data.taxBaselineIncome
             && (data.federalTaxPerPaycheck > 0 || data.stateTaxPerPaycheck > 0)) {
-            data.taxBaselineIncome = getTaxableIncome();
+            data.taxBaselineIncome = getStubBaseline().income;
+            saveData();
+        }
+        if (data.taxInputMode === 'dollars' && data.taxBaselineIncome > 0 && !data.ficaBaselineWages
+            && (data.socialSecurityPerPaycheck > 0 || data.medicarePerPaycheck > 0)) {
+            data.ficaBaselineWages = getStubBaseline().fica;
             saveData();
         }
     } catch (e) {
@@ -103,13 +114,41 @@ function dollarsToPercent(dollars) {
     return data.grossAnnualSalary > 0 ? (dollars / data.grossAnnualSalary) * 100 : 0;
 }
 
-// Income subject to income tax: gross minus pre-tax deductions (Traditional
-// 401k, HSA, health insurance).
-function getTaxableIncome() {
-    const preTax = percentToDollars(data.allocations.traditional401k)
-        + percentToDollars(data.allocations.hsa)
-        + data.healthInsurancePremium * 12;
-    return Math.max(0, data.grossAnnualSalary - preTax);
+// How many checks a year have HSA taken out, and how many don't.
+function getCheckCounts() {
+    const freq = data.payFrequency;
+    const withHSA = data.hsaSchedule === 'monthly' ? Math.min(12, freq) : freq;
+    return { withHSA, withoutHSA: freq - withHSA };
+}
+
+// Wages for a single check, before taxes. HSA through payroll is exempt from
+// both income tax and FICA; Traditional 401k is exempt from income tax only.
+function getCheckWages(hasHSA) {
+    const freq = data.payFrequency;
+    const counts = getCheckCounts();
+    const hsaPerCheck = hasHSA && counts.withHSA > 0
+        ? percentToDollars(data.allocations.hsa) / counts.withHSA : 0;
+    const gross = data.grossAnnualSalary / freq;
+    const health = data.healthInsurancePremium * 12 / freq;
+    const trad401k = percentToDollars(data.allocations.traditional401k) / freq;
+    return {
+        gross, health, trad401k, hsa: hsaPerCheck,
+        taxable: Math.max(0, gross - health - trad401k - hsaPerCheck),
+        ficaWages: Math.max(0, gross - health - hsaPerCheck)
+    };
+}
+
+// Annualized wages of the check the withholding was copied from; this is
+// what "Lock in" anchors to. With HSA on every check it equals annual
+// taxable income, matching the original anchor.
+function stubHasHSA() {
+    return data.hsaSchedule !== 'monthly' || data.taxStubHasHSA;
+}
+
+function getStubBaseline() {
+    const w = getCheckWages(stubHasHSA());
+    const freq = data.payFrequency;
+    return { income: w.taxable * freq, fica: w.ficaWages * freq };
 }
 
 // ====== LIMITS ======
@@ -146,6 +185,7 @@ function calculateBreakdown() {
 
     const employerMatchDollars = percentToDollars(data.employerMatch);
     const healthInsAnnual = data.healthInsurancePremium * 12;
+    const freq = data.payFrequency;
 
     // Pre-tax deductions
     const preTaxDeductions = {
@@ -154,62 +194,64 @@ function calculateBreakdown() {
         healthInsurance: healthInsAnnual
     };
     const totalPreTax = Object.values(preTaxDeductions).reduce((a, b) => a + b, 0);
-    const taxableIncome = Math.max(0, gross - totalPreTax);
 
-    // Calculate taxes based on mode
-    let taxes;
-    if (data.taxInputMode === 'dollars') {
-        const freq = data.payFrequency;
+    // Dollar mode: entered per-check amounts reproduce exactly on the stub
+    // check at lock-in, then scale with that check's taxable / FICA wages.
+    const enteredFederal = data.federalTaxPerPaycheck;
+    const enteredIncomeTax = enteredFederal + data.stateTaxPerPaycheck;
+    const federalRatio = enteredIncomeTax > 0 ? enteredFederal / enteredIncomeTax : 0;
+    // Fall back to gross minus health if no baseline was captured yet.
+    const incomeRef = (data.taxBaselineIncome > 0 ? data.taxBaselineIncome : gross - healthInsAnnual) / freq;
+    const ficaRef = data.ficaBaselineWages / freq;
 
-        // FICA taxes are based on gross wages (not reduced by 401k contributions)
-        taxes = {
-            ss: data.socialSecurityPerPaycheck * freq,
-            medicare: data.medicarePerPaycheck * freq,
-            other: data.otherPayrollPerPaycheck * freq
-        };
-        taxes.payroll = taxes.ss + taxes.medicare + taxes.other;
-
-        // Income taxes ARE reduced by pre-tax contributions (traditional 401k, HSA)
-        // Derive effective rate from entered amounts, then apply to actual taxable income
-        const enteredFederal = data.federalTaxPerPaycheck * freq;
-        const enteredState = data.stateTaxPerPaycheck * freq;
-        const enteredIncomeTax = enteredFederal + enteredState;
-
-        // Anchor the effective rate to the taxable income captured when the
-        // withholding was entered, so the entered dollars reproduce exactly at
-        // that point and scale proportionally as pre-tax contributions change.
-        // Fall back to gross minus health if no baseline was captured yet.
-        const referenceIncome = data.taxBaselineIncome > 0
-            ? data.taxBaselineIncome
-            : gross - healthInsAnnual;
-
-        if (referenceIncome > 0 && enteredIncomeTax > 0) {
-            // Calculate effective rate and apply to actual taxable income
-            const effectiveIncomeRate = enteredIncomeTax / referenceIncome;
-            taxes.income = taxableIncome * effectiveIncomeRate;
-
-            // Split proportionally between federal and state for display
-            const federalRatio = enteredFederal / enteredIncomeTax;
-            taxes.federal = taxes.income * federalRatio;
-            taxes.state = taxes.income * (1 - federalRatio);
+    // Taxes and take-home for one check, with or without HSA taken out.
+    const calcCheck = hasHSA => {
+        const w = getCheckWages(hasHSA);
+        let t;
+        if (data.taxInputMode === 'dollars') {
+            const ficaScale = ficaRef > 0 ? w.ficaWages / ficaRef : 1;
+            t = {
+                ss: data.socialSecurityPerPaycheck * ficaScale,
+                medicare: data.medicarePerPaycheck * ficaScale,
+                other: data.otherPayrollPerPaycheck * ficaScale
+            };
+            if (incomeRef > 0 && enteredIncomeTax > 0) {
+                t.income = w.taxable * (enteredIncomeTax / incomeRef);
+            } else {
+                t.income = enteredIncomeTax;
+            }
+            t.federal = t.income * federalRatio;
+            t.state = t.income - t.federal;
         } else {
-            taxes.income = enteredIncomeTax;
-            taxes.federal = enteredFederal;
-            taxes.state = enteredState;
+            t = {
+                federal: null,
+                state: null,
+                ss: w.ficaWages * (data.socialSecurityRate / 100),
+                medicare: w.ficaWages * (data.medicareRate / 100),
+                other: w.ficaWages * (data.otherPayrollTaxRate / 100),
+                income: w.taxable * (data.incomeTaxRate / 100)
+            };
         }
-    } else {
-        const ficaWages = Math.max(0, gross - healthInsAnnual);
-        taxes = {
-            federal: null,
-            state: null,
-            ss: ficaWages * (data.socialSecurityRate / 100),
-            medicare: ficaWages * (data.medicareRate / 100),
-            other: ficaWages * (data.otherPayrollTaxRate / 100),
-            income: taxableIncome * (data.incomeTaxRate / 100)
-        };
-        taxes.payroll = taxes.ss + taxes.medicare + taxes.other;
-    }
-    taxes.total = taxes.payroll + taxes.income;
+        t.payroll = t.ss + t.medicare + t.other;
+        t.total = t.payroll + t.income;
+        // The deposited check excludes only payroll-withheld items (Roth
+        // 401k). Roth IRA is funded manually after the check arrives.
+        const inCheck = w.taxable - t.total - dollars.roth401k / freq;
+        return { ...w, taxes: t, inCheck, afterRothIRA: inCheck - dollars.rothIRA / freq };
+    };
+
+    const counts = getCheckCounts();
+    const checks = { withHSA: calcCheck(true), withoutHSA: calcCheck(false), counts };
+    const annual = fn => fn(checks.withHSA) * counts.withHSA + fn(checks.withoutHSA) * counts.withoutHSA;
+
+    const taxableIncome = annual(c => c.taxable);
+    const taxes = {};
+    ['ss', 'medicare', 'other', 'payroll', 'income', 'total'].forEach(k => {
+        taxes[k] = annual(c => c.taxes[k]);
+    });
+    const isDollar = data.taxInputMode === 'dollars';
+    taxes.federal = isDollar ? annual(c => c.taxes.federal) : null;
+    taxes.state = isDollar ? annual(c => c.taxes.state) : null;
 
     // Post-tax deductions
     const postTaxDeductions = {
@@ -224,8 +266,6 @@ function calculateBreakdown() {
     const takeHome = afterTax - totalPostTax;
     const totalSavings = Object.values(dollars).reduce((a, b) => a + b, 0);
 
-    // Per-paycheck view: the deposited check excludes only payroll-withheld
-    // items (Roth 401k). Roth IRA is funded manually after the check arrives.
     const paycheckAnnual = afterTax - dollars.roth401k;
     const afterRothIRAAnnual = paycheckAnnual - dollars.rothIRA;
 
@@ -236,22 +276,19 @@ function calculateBreakdown() {
     return {
         gross, taxableIncome, taxes, afterTax, takeHome, savingsRate,
         preTaxDeductions, postTaxDeductions, totalPreTax, totalPostTax,
-        totalSavings, employerMatchDollars, paycheckAnnual, afterRothIRAAnnual
+        totalSavings, employerMatchDollars, paycheckAnnual, afterRothIRAAnnual, checks
     };
 }
 
 // ====== UI UPDATES ======
 function updateSliderFill(slider) {
-    const pct = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+    const range = slider.max - slider.min;
+    const pct = range > 0 ? ((slider.value - slider.min) / range) * 100 : 0;
     slider.style.setProperty('--slider-percent', pct + '%');
 }
 
 function updateUI() {
     const b = calculateBreakdown();
-
-    // Dashboard
-    $('monthlyTakeHome').textContent = formatCurrency(b.takeHome / 12);
-    $('annualTakeHome').textContent = formatCurrency(b.takeHome);
 
     // Per-paycheck take-home (before and after manual Roth IRA contribution)
     const freq = data.payFrequency;
@@ -261,15 +298,35 @@ function updateUI() {
     $('paycheckAfterRothIRA').classList.toggle('negative', b.afterRothIRAAnnual < 0);
     $('paycheckFreqLabel').textContent = freq === 26 ? 'Biweekly · 26/yr' : 'Semi-monthly · 24/yr';
 
-    // Anchor status: compare current taxable income to the locked-in baseline
+    // When HSA comes out of only one check a month, show both checks.
+    const split = b.checks.counts.withoutHSA > 0;
+    $('paycheckSingle').style.display = split ? 'none' : 'flex';
+    $('paycheckSplit').style.display = split ? 'flex' : 'none';
+    if (split) {
+        [['WithHSA', b.checks.withHSA, b.checks.counts.withHSA, 'With HSA'],
+         ['WithoutHSA', b.checks.withoutHSA, b.checks.counts.withoutHSA, 'Without HSA']]
+            .forEach(([key, c, count, title]) => {
+                $('paycheck' + key + 'Title').textContent = `${title} · ${count}/yr`;
+                $('paycheck' + key).textContent = formatCurrency(c.inCheck);
+                $('paycheck' + key + 'AfterRothIRA').textContent = formatCurrency(c.afterRothIRA);
+                $('paycheck' + key).classList.toggle('negative', c.inCheck < 0);
+                $('paycheck' + key + 'AfterRothIRA').classList.toggle('negative', c.afterRothIRA < 0);
+            });
+    }
+    $('sumCheckLabel').textContent = split ? 'Avg / Check' : 'Per Check';
+    $$('.stub-hsa-group').forEach(el => el.style.display = split ? 'block' : 'none');
+
+    // Anchor status: compare the stub check's current taxable income to the
+    // locked-in baseline
     const baseline = data.taxBaselineIncome;
     const anchorStatus = $('anchorStatus');
     if (anchorStatus) {
         if (!(baseline > 0)) {
             anchorStatus.textContent = 'Not anchored yet — lock in to match your real paycheck';
             anchorStatus.className = 'anchor-status unset';
-        } else if (Math.abs(b.taxableIncome - baseline) < 1) {
-            anchorStatus.textContent = `Anchored — matches your real paycheck (${formatCurrency(b.paycheckAnnual / freq)}/check)`;
+        } else if (Math.abs(getStubBaseline().income - baseline) < 1) {
+            const stubCheck = stubHasHSA() ? b.checks.withHSA : b.checks.withoutHSA;
+            anchorStatus.textContent = `Anchored — matches your real paycheck (${formatCurrency(stubCheck.inCheck)}/check)`;
             anchorStatus.className = 'anchor-status anchored';
         } else {
             anchorStatus.textContent = 'Exploring — income tax estimated from your locked-in paycheck. Lock in again if these are now your real numbers.';
@@ -278,8 +335,20 @@ function updateUI() {
     }
     $('currentRate').textContent = b.savingsRate.toFixed(1) + '%';
     $('savingsProgress').style.width = Math.min(b.savingsRate / 25 * 100, 100) + '%';
-    $('monthlyTakeHome').classList.toggle('negative', b.takeHome < 0);
     $('matchValue').textContent = formatCurrency(b.employerMatchDollars) + '/yr';
+
+    // Summary table: gross decomposes into taxes + health + savings + take-home,
+    // shown per paycheck / month / year.
+    const setSummaryRow = (key, annual) => {
+        $('sum' + key + 'Check').textContent = formatCurrency(annual / freq);
+        $('sum' + key + 'Month').textContent = formatCurrency(annual / 12);
+        $('sum' + key + 'Year').textContent = formatCurrency(annual);
+    };
+    setSummaryRow('Gross', b.gross);
+    setSummaryRow('Tax', b.taxes.total);
+    setSummaryRow('Health', b.preTaxDeductions.healthInsurance);
+    setSummaryRow('Savings', b.totalSavings);
+    setSummaryRow('TakeHome', b.takeHome);
 
     // Status message
     let status;
@@ -351,9 +420,15 @@ function updateUI() {
         const limitEl = $(type + 'LimitStatus');
 
         if (slider && input) {
-            slider.max = Math.min(100, getMaxPercent(type) + pct);
-            slider.value = pct;
-            input.value = pct.toFixed(1);
+            // getMaxPercent returns the cap for this allocation, not the
+            // remaining headroom, so pct must not be added back in.
+            const maxPct = getMaxPercent(type);
+            slider.max = maxPct;
+            input.max = maxPct.toFixed(1);
+            // Never rewrite the control the user is editing: reformatting on
+            // every keystroke makes multi-digit and decimal entry impossible.
+            if (slider !== document.activeElement) slider.value = pct;
+            if (input !== document.activeElement) input.value = pct.toFixed(1);
             updateSliderFill(slider);
         }
 
@@ -471,11 +546,31 @@ function setupEvents() {
         });
     });
 
-    $$('.hsa-toggle .toggle-btn').forEach(btn => {
+    $$('.hsa-toggle .toggle-btn[data-type]').forEach(btn => {
         btn.addEventListener('click', e => {
-            $$('.hsa-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+            $$('.hsa-toggle .toggle-btn[data-type]').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             data.hsaCoverageType = e.target.dataset.type;
+            saveData();
+            updateUI();
+        });
+    });
+
+    $$('.hsa-schedule-toggle .toggle-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            $$('.hsa-schedule-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            data.hsaSchedule = e.target.dataset.schedule;
+            saveData();
+            updateUI();
+        });
+    });
+
+    $$('.stub-toggle .toggle-btn').forEach(btn => {
+        btn.addEventListener('click', e => {
+            $$('.stub-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            data.taxStubHasHSA = e.target.dataset.stub === 'with';
             saveData();
             updateUI();
         });
@@ -491,11 +586,22 @@ function setupEvents() {
         };
         bindInput(type + 'Slider', handler);
         bindInput(type + 'Input', handler);
+
+        // Snap the box to the stored (clamped) value on blur, so a half-typed
+        // or over-limit entry doesn't linger in the field.
+        const input = $(type + 'Input');
+        if (input) {
+            input.addEventListener('blur', () => {
+                input.value = data.allocations[type].toFixed(1);
+            });
+        }
     });
 
     // Anchor: lock in current setup as the real paycheck
     $('anchorBtn').addEventListener('click', () => {
-        data.taxBaselineIncome = getTaxableIncome();
+        const stub = getStubBaseline();
+        data.taxBaselineIncome = stub.income;
+        data.ficaBaselineWages = stub.fica;
         saveData();
         updateUI();
     });
@@ -539,8 +645,12 @@ function populateForm() {
     $('otherPayrollPerPaycheck').value = data.otherPayrollPerPaycheck || 0;
 
     // Toggles
-    $$('.hsa-toggle .toggle-btn').forEach(btn =>
+    $$('.hsa-toggle .toggle-btn[data-type]').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.type === data.hsaCoverageType));
+    $$('.hsa-schedule-toggle .toggle-btn').forEach(btn =>
+        btn.classList.toggle('active', btn.dataset.schedule === data.hsaSchedule));
+    $$('.stub-toggle .toggle-btn').forEach(btn =>
+        btn.classList.toggle('active', (btn.dataset.stub === 'with') === data.taxStubHasHSA));
 
     updateTaxModeUI();
 
