@@ -553,7 +553,7 @@ function buildCompareSliders() {
     $('compareSliders').innerHTML = ACCOUNT_LABELS.map(([label, type]) => `
         <div class="compare-slider-row">
             <label for="cmp${type}Slider">${label}</label>
-            <input type="range" class="allocation-slider" id="cmp${type}Slider" min="0" max="100" step="0.5" value="0">
+            <input type="range" class="allocation-slider" id="cmp${type}Slider" min="0" max="100" step="any" value="0">
             <span class="compare-slider-value" id="cmp${type}Value"></span>
         </div>`).join('');
 }
@@ -755,8 +755,17 @@ function setupEvents() {
             saveData();
             updateUI();
         };
-        bindInput(type + 'Slider', handler);
-        bindInput('cmp' + type + 'Slider', handler);
+        // Sliders move freely (step="any") and snap to 0.1%, except at the
+        // top, where they snap to the exact IRS limit. A fixed step would
+        // stop short of a limit that isn't a step multiple (e.g. $7,500 =
+        // 6.82% of salary).
+        const sliderHandler = v => {
+            const maxPct = getMaxPercent(type);
+            const pct = Math.round(parseNum(v) * 10) / 10;
+            handler(pct >= maxPct - 0.05 ? maxPct : pct);
+        };
+        bindInput(type + 'Slider', sliderHandler);
+        bindInput('cmp' + type + 'Slider', sliderHandler);
         bindInput(type + 'Input', handler);
 
         // Snap the box to the stored (clamped) value on blur, so a half-typed
