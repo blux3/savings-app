@@ -44,6 +44,9 @@ function getDefaultData() {
         otherStubFederal: 0,
         otherStubState: 0,
         otherStubBaselineIncome: 0,
+        // Contribution setup saved at lock-in; the comparison panel treats it
+        // as "Current" and the live sliders as "Proposed".
+        currentSetup: null,
         employerMatch: 0,
         includeMatchInRate: true,
         allocations: {
@@ -169,6 +172,16 @@ function hasOtherStub() {
 // ====== LIMITS ======
 function getHSALimit() {
     return data.hsaCoverageType === 'family' ? IRS_LIMITS.hsaFamily : IRS_LIMITS.hsaIndividual;
+}
+
+// Slider track length. 401k sliders share one limit, so both tracks stay on
+// the full combined scale; moving one doesn't rescale (and visibly shift) the
+// other. The input handler still clamps to the remaining headroom.
+function getSliderMax(type) {
+    const is401k = type === 'traditional401k' || type === 'roth401k';
+    return is401k && data.grossAnnualSalary > 0
+        ? Math.min(100, dollarsToPercent(IRS_LIMITS.combined401k))
+        : getMaxPercent(type);
 }
 
 function getMaxPercent(type) {
@@ -309,6 +322,20 @@ function calculateBreakdown() {
         preTaxDeductions, postTaxDeductions, totalPreTax, totalPostTax,
         totalSavings, employerMatchDollars, paycheckAnnual, afterRothIRAAnnual, checks
     };
+}
+
+// Breakdown for a saved contribution setup. Salary, health insurance, tax
+// inputs and employer match stay shared; only contributions are swapped.
+function breakdownFor(setup) {
+    const saved = { allocations: data.allocations, hsaSchedule: data.hsaSchedule };
+    try {
+        data.allocations = { ...data.allocations, ...setup.allocations };
+        data.hsaSchedule = setup.hsaSchedule;
+        return calculateBreakdown();
+    } finally {
+        data.allocations = saved.allocations;
+        data.hsaSchedule = saved.hsaSchedule;
+    }
 }
 
 // ====== UI UPDATES ======
@@ -459,13 +486,7 @@ function updateUI() {
             // getMaxPercent returns the cap for this allocation, not the
             // remaining headroom, so pct must not be added back in.
             const maxPct = getMaxPercent(type);
-            // 401k sliders share one limit. Keep both tracks on the full
-            // combined scale so moving one doesn't rescale (and visibly
-            // shift) the other; the handler still clamps to the headroom.
-            const is401k = type === 'traditional401k' || type === 'roth401k';
-            slider.max = is401k && data.grossAnnualSalary > 0
-                ? Math.min(100, dollarsToPercent(IRS_LIMITS.combined401k))
-                : maxPct;
+            slider.max = getSliderMax(type);
             input.max = maxPct.toFixed(1);
             // Never rewrite the text box being typed in: reformatting on every
             // keystroke makes multi-digit and decimal entry impossible. The
@@ -517,6 +538,111 @@ function updateUI() {
 
     const hsaLimit = getHSALimit();
     $('hsaLimit').textContent = `Max: ${formatCurrency(hsaLimit)}/yr (${dollarsToPercent(hsaLimit).toFixed(1)}% of salary)`;
+
+    updateComparison(b);
+}
+
+const ACCOUNT_LABELS = [
+    ['Traditional 401k', 'traditional401k'], ['Roth 401k', 'roth401k'], ['HSA', 'hsa'],
+    ['Roth IRA', 'rothIRA'], ['Emergency fund', 'emergencyFund'], ['Brokerage', 'taxableBrokerage']
+];
+
+// Compact sliders inside the comparison card. They drive the same
+// allocations as the main sliders, so the two stay in sync.
+function buildCompareSliders() {
+    $('compareSliders').innerHTML = ACCOUNT_LABELS.map(([label, type]) => `
+        <div class="compare-slider-row">
+            <label for="cmp${type}Slider">${label}</label>
+            <input type="range" class="allocation-slider" id="cmp${type}Slider" min="0" max="100" step="0.5" value="0">
+            <span class="compare-slider-value" id="cmp${type}Value"></span>
+        </div>`).join('');
+}
+
+function updateCompareSliders() {
+    const setup = data.currentSetup;
+    ACCOUNT_LABELS.forEach(([, type]) => {
+        const slider = $('cmp' + type + 'Slider');
+        const pct = data.allocations[type];
+        slider.max = getSliderMax(type);
+        slider.value = pct;
+        updateSliderFill(slider);
+        const was = setup ? setup.allocations[type] || 0 : pct;
+        const changed = Math.abs(was - pct) >= 0.05;
+        $('cmp' + type + 'Value').innerHTML = `${pct.toFixed(1)}% · ${formatCurrency(percentToDollars(pct))}/yr`
+            + (changed ? ` <span class="was">was ${was.toFixed(1)}%</span>` : '');
+    });
+}
+
+// Current (locked-in) vs. Proposed (live sliders) comparison panel.
+function updateComparison(proposed) {
+    const setup = data.currentSetup;
+    updateCompareSliders();
+    $('compareEmpty').style.display = setup ? 'none' : 'block';
+    $('compareResetBtn').style.display = setup ? 'inline-block' : 'none';
+    if (!setup) {
+        $('compareRows').innerHTML = '';
+        $('compareTakeaway').textContent = '';
+        return;
+    }
+    const current = breakdownFor(setup);
+
+    // [label, value fn, higherIsBetter, format, startsSection]
+    const money = formatCurrency;
+    const pct = v => v.toFixed(1) + '%';
+    const rows = [];
+    const split = proposed.checks.counts.withoutHSA > 0 || current.checks.counts.withoutHSA > 0;
+    if (split) {
+        rows.push(['Check w/ HSA', b => b.checks.withHSA.inCheck, true, money]);
+        rows.push(['Check w/o HSA', b => b.checks.withoutHSA.inCheck, true, money]);
+    } else {
+        rows.push(['Per check', b => b.checks.withHSA.inCheck, true, money]);
+    }
+    rows.push(['After Roth IRA / check', b => b.afterRothIRAAnnual / data.payFrequency, true, money]);
+    rows.push(['Take-home / month', b => b.takeHome / 12, true, money]);
+    rows.push(['Take-home / year', b => b.takeHome, true, money]);
+    rows.push(['Taxes / year', b => b.taxes.total, false, money, true]);
+
+    let first = true;
+    ACCOUNT_LABELS.forEach(([label, key]) => {
+        const val = b => ({ ...b.preTaxDeductions, ...b.postTaxDeductions })[key] || 0;
+        if (val(current) < 0.5 && val(proposed) < 0.5) return;
+        rows.push([label, val, true, money, first]);
+        first = false;
+    });
+    rows.push(['Total savings / year', b => b.totalSavings, true, money, true]);
+    rows.push(['Employer match / year', b => b.employerMatchDollars, true, money]);
+    rows.push(['Savings rate', b => b.savingsRate, true, pct]);
+
+    $('compareRows').innerHTML = rows.map(([label, fn, higherIsBetter, fmt, section]) => {
+        const cur = fn(current), prop = fn(proposed), diff = prop - cur;
+        const isZero = Math.abs(diff) < (fmt === pct ? 0.05 : 0.5);
+        const good = (diff > 0) === higherIsBetter;
+        const cls = isZero ? 'zero' : good ? 'up' : 'down';
+        const sign = diff > 0 ? '+' : '−';
+        const delta = isZero ? '—' : sign + fmt(Math.abs(diff));
+        return `<div class="summary-row${section ? ' section' : ''}">
+            <span class="summary-label">${label}</span>
+            <span class="num neg">${fmt(cur)}</span>
+            <span class="num">${fmt(prop)}</span>
+            <span class="num delta ${cls}">${delta}</span>
+        </div>`;
+    }).join('');
+
+    // Takeaway: how much of the extra saving is paid for by lower taxes.
+    const moreSaved = proposed.totalSavings - current.totalSavings;
+    const lessTakeHome = current.takeHome - proposed.takeHome;
+    const taxSaved = current.taxes.total - proposed.taxes.total;
+    let takeaway;
+    if (Math.abs(moreSaved) < 0.5 && Math.abs(lessTakeHome) < 0.5) {
+        takeaway = 'No change — move the sliders to try a new setup.';
+    } else if (moreSaved > 0) {
+        takeaway = `Saving ${money(moreSaved)}/yr more costs ${money(lessTakeHome)}/yr in take-home`
+            + (taxSaved >= 0.5 ? ` — lower taxes cover ${money(taxSaved)}.` : '.');
+    } else {
+        takeaway = `Saving ${money(-moreSaved)}/yr less adds ${money(-lessTakeHome)}/yr to take-home`
+            + (taxSaved <= -0.5 ? ` — ${money(-taxSaved)} of it goes to higher taxes.` : '.');
+    }
+    $('compareTakeaway').textContent = takeaway;
 }
 
 function updateTaxModeUI() {
@@ -630,6 +756,7 @@ function setupEvents() {
             updateUI();
         };
         bindInput(type + 'Slider', handler);
+        bindInput('cmp' + type + 'Slider', handler);
         bindInput(type + 'Input', handler);
 
         // Snap the box to the stored (clamped) value on blur, so a half-typed
@@ -648,7 +775,22 @@ function setupEvents() {
         data.taxBaselineIncome = stub.income;
         data.ficaBaselineWages = stub.fica;
         data.otherStubBaselineIncome = stub.otherIncome;
+        data.currentSetup = {
+            allocations: { ...data.allocations },
+            hsaSchedule: data.hsaSchedule,
+            savedAt: Date.now()
+        };
         saveData();
+        updateUI();
+    });
+
+    // Comparison: put the sliders back to the locked-in setup
+    $('compareResetBtn').addEventListener('click', () => {
+        if (!data.currentSetup) return;
+        data.allocations = { ...data.allocations, ...data.currentSetup.allocations };
+        data.hsaSchedule = data.currentSetup.hsaSchedule;
+        saveData();
+        populateForm();
         updateUI();
     });
 
@@ -714,6 +856,7 @@ function populateForm() {
 // ====== INIT ======
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
+    buildCompareSliders();
     populateForm();
     setupEvents();
     updateUI();

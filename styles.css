@@ -1024,3 +1024,93 @@ footer {
     font-size: 0.7rem;
     color: var(--text-muted);
 }
+
+/* Current vs. Proposed comparison */
+.compare-card .summary-row.section {
+    margin-top: 0.3rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid var(--border);
+}
+
+.compare-card .num.delta.up {
+    color: var(--success);
+}
+
+.compare-card .num.delta.down {
+    color: var(--warning);
+}
+
+.compare-card .num.delta.zero {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.compare-empty,
+.compare-takeaway {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin: 0.6rem 0 0;
+    line-height: 1.4;
+}
+
+.compare-reset {
+    margin-top: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    cursor: pointer;
+}
+
+.compare-reset:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+}
+
+.compare-sliders {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.6rem 0 0.8rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.3rem;
+}
+
+.compare-slider-row {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr 9.5rem;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.compare-slider-row label {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.compare-slider-value {
+    text-align: right;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+
+.compare-slider-value .was {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 400;
+    color: var(--text-muted);
+}
+
+@media (max-width: 480px) {
+    .compare-slider-row {
+        grid-template-columns: 1fr auto;
+    }
+    .compare-slider-row .allocation-slider {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+}

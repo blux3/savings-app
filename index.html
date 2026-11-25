@@ -97,6 +97,21 @@
                 </div>
             </div>
 
+            <!-- Current (locked-in) vs. Proposed (live sliders) -->
+            <div class="summary-card compare-card">
+                <div class="summary-head">
+                    <span class="summary-title">Current vs. Proposed</span>
+                    <span class="col-label">Current</span>
+                    <span class="col-label">Proposed</span>
+                    <span class="col-label">Change</span>
+                </div>
+                <div class="compare-sliders" id="compareSliders"></div>
+                <p class="compare-empty" id="compareEmpty">Lock in your real paycheck to save your current setup, then move the sliders to try a new one.</p>
+                <div id="compareRows"></div>
+                <p class="compare-takeaway" id="compareTakeaway"></p>
+                <button type="button" class="compare-reset" id="compareResetBtn">Reset sliders to current</button>
+            </div>
+
             <div class="savings-rate-card">
                 <div class="rate-header">
                     <span class="rate-label">Savings Rate</span>
